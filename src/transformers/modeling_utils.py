@@ -479,6 +479,8 @@ def set_initialized_submodules(model, state_dict_keys):
 
 def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
     # Convert old format to new format if needed from a PyTorch state_dict
+    import time
+
     old_keys = []
     new_keys = []
     for key in state_dict.keys():
@@ -520,9 +522,13 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
                     # because zero3 puts placeholders in model params, this context
                     # manager gathers (unpartitions) the params of the current layer, then loads from
                     # the state dict and then re-partitions them again
+                    
                     with deepspeed.zero.GatheredParameters(params_to_gather, modifier_rank=0):
                         if torch.distributed.get_rank() == 0:
+                            start_time = time.time()
                             module._load_from_state_dict(*args)
+                            interval = time.time() - start_time
+                            print(f"[module._load_from_state_dict(*args)] this module load time: {interval}s")
             else:
                 module._load_from_state_dict(*args)
 
@@ -2607,9 +2613,12 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
         elif load_in_8bit or low_cpu_mem_usage:
             init_contexts.append(init_empty_weights())
 
+        print("!!!!!!!!!NOW before with ContextManagers!!!!!!!!!")
         with ContextManagers(init_contexts):
+            print("!!!!!!!!!!Now just get in With Content!!!!!!")
             model = cls(config, *model_args, **model_kwargs)
-
+        
+        print("!!!!!!!!!NOW out of with ContextManagers!!!!!!!!!")
         # Check first if we are `from_pt`
         if use_keep_in_fp32_modules:
             low_cpu_mem_usage = True
@@ -2762,8 +2771,16 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
                     " installation instructions."
                 )
                 raise
+
+            
+
         elif from_pt:
             # restore default dtype
+            print("!!!!!!!!!!!!!Next: _load_pretrained_model !!!!!!!!")
+
+            # print("!!!!!!!!!!!!Saving model before")
+            # torch.save(model.state_dict(), '/home/mark/Research/a_MoE_experiments/model_before.pth')
+
             if dtype_orig is not None:
                 torch.set_default_dtype(dtype_orig)
 
@@ -2791,6 +2808,18 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
                 load_in_8bit=load_in_8bit,
                 keep_in_fp32_modules=keep_in_fp32_modules,
             )
+
+            # print("!!!!!!!!!!!!Saving model after")
+            # torch.save(model.state_dict(), '/home/mark/Research/a_MoE_experiments/model_after.pth')
+            # model.load_state_dict(torch.load('model_state_dict.pth'))
+
+            
+
+            
+            # if (model.state_dict() == model_before.state_dict()):
+            #     print("!!!!!!!!!!!!!!!!!YES IS SAME!!!!!!!!!!")
+            # else:
+            #     print("!!!!!!!!!!!!!!!!!NO IS NOT SAME!!!!!!!!!!")
 
         model.is_loaded_in_8bit = load_in_8bit
 
@@ -2824,10 +2853,12 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
                 pass
 
         # Dispatch model with hooks on all devices if necessary
-        if device_map is not None:
+        if device_map is not None:  # my: device_map is None
+            print("!!!!!!!!!!!!TEST: device_map is not None!!!!!!!!!!")
             dispatch_model(model, device_map=device_map, offload_dir=offload_folder, offload_index=offload_index)
 
         if output_loading_info:
+            print("!!!!!!!!!!!!TEST: output_loading_info!!!!!!!!!!")
             if loading_info is None:
                 loading_info = {
                     "missing_keys": missing_keys,
@@ -3069,7 +3100,81 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
                 remove_prefix_from_model,
                 ignore_mismatched_sizes,
             )
+            # print("asdfhasdfasdjflk we are going to")
+            import copy
+            file_path = "/home/mark/Research/a_MoE_experiments/model_state_dict_compare.txt"
+            state_dict_before = copy.deepcopy(model_to_load.state_dict())
+            model_before = copy.deepcopy(model_to_load)
+            torch.save(model_to_load.state_dict(), '/home/mark/Research/a_MoE_experiments/inner_model_state_dict_before2.pth')
+
+            import time
+            start_time = time.time()
             error_msgs = _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
+            # error_msgs = []
+            end_time = time.time()
+            print(f"Time taken to load '_load_state_dict_into_model()': {end_time - start_time}")
+            # Time taken to load '_load_state_dict_into_model()': 241.27114534378052
+            def compareModelWeights(model_a, model_b):
+                module_a = model_a._modules
+                module_b = model_b._modules
+                if len(list(module_a.keys())) != len(list(module_b.keys())):
+                    return False
+                a_modules_names = list(module_a.keys())
+                b_modules_names = list(module_b.keys())
+                for i in range(len(a_modules_names)):
+                    layer_name_a = a_modules_names[i]
+                    layer_name_b = b_modules_names[i]
+                    if layer_name_a != layer_name_b:
+                        return False
+                    layer_a = module_a[layer_name_a]
+                    layer_b = module_b[layer_name_b]
+                    if (
+                        (type(layer_a) == nn.Module) or (type(layer_b) == nn.Module) or
+                        (type(layer_a) == nn.Sequential) or (type(layer_b) == nn.Sequential)
+                        ):
+                        if not compareModelWeights(layer_a, layer_b):
+                            return False
+                    if hasattr(layer_a, 'weight') and hasattr(layer_b, 'weight'):
+                        if not torch.equal(layer_a.weight.data, layer_b.weight.data):
+                            return False
+                return True
+            def validate_state_dicts(model_state_dict_1, model_state_dict_2):
+                if len(model_state_dict_1) != len(model_state_dict_2):
+                    print(
+                        f"Length mismatch: {len(model_state_dict_1)}, {len(model_state_dict_2)}"
+                    )
+                    return False
+
+                # Replicate modules have "module" attached to their keys, so strip these off when comparing to local model.
+                if next(iter(model_state_dict_1.keys())).startswith("module"):
+                    model_state_dict_1 = {
+                        k[len("module") + 1 :]: v for k, v in model_state_dict_1.items()
+                    }
+
+                if next(iter(model_state_dict_2.keys())).startswith("module"):
+                    model_state_dict_2 = {
+                        k[len("module") + 1 :]: v for k, v in model_state_dict_2.items()
+                    }
+
+                for ((k_1, v_1), (k_2, v_2)) in zip(
+                    model_state_dict_1.items(), model_state_dict_2.items()
+                ):
+                    if k_1 != k_2:
+                        print(f"Key mismatch: {k_1} vs {k_2}")
+                        return False
+                    # convert both to the same CUDA device
+                    if str(v_1.device) != "cuda:0":
+                        v_1 = v_1.to("cuda:0" if torch.cuda.is_available() else "cpu")
+                    if str(v_2.device) != "cuda:0":
+                        v_2 = v_2.to("cuda:0" if torch.cuda.is_available() else "cpu")
+
+                    if not torch.allclose(v_1, v_2):
+                        print(f"Tensor mismatch: {v_1} vs {v_2}")
+                        return False
+                return True
+            print(f"!!!!!!!!!!!!!!VALIDAT:{compareModelWeights(model_before, model_to_load)}")
+            torch.save(model_to_load.state_dict(), '/home/mark/Research/a_MoE_experiments/inner_model_state_dict_after2.pth')
+
             offload_index = None
         else:
             # Sharded checkpoint or whole but low_cpu_mem_usage==True
