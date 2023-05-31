@@ -1470,6 +1470,7 @@ class GenerationMixin:
         )
         # 10. go into different generation modes
         if is_assisted_gen_mode:
+            print("!!!!!!!!!!is_assisted_gen_mode")
             if generation_config.num_return_sequences > 1:
                 raise ValueError(
                     "num_return_sequences has to be 1 when doing assisted generate, "
@@ -1508,6 +1509,7 @@ class GenerationMixin:
                 **model_kwargs,
             )
         if is_greedy_gen_mode:
+            print("!!!!!!!!!!is_greedy_gen_mode")
             if generation_config.num_return_sequences > 1:
                 raise ValueError(
                     "num_return_sequences has to be 1 when doing greedy search, "
@@ -1529,6 +1531,7 @@ class GenerationMixin:
             )
 
         elif is_contrastive_search_gen_mode:
+            print("!!!!!!!!!!is_contrastive_search_gen_mode")
             if generation_config.num_return_sequences > 1:
                 raise ValueError(
                     "num_return_sequences has to be 1 when doing contrastive search, "
@@ -1553,6 +1556,7 @@ class GenerationMixin:
             )
 
         elif is_sample_gen_mode:
+            print("!!!!!!!!!!is_sample_gen_mode")
             # 11. prepare logits warper
             logits_warper = self._get_logits_warper(generation_config)
 
@@ -1580,6 +1584,7 @@ class GenerationMixin:
             )
 
         elif is_beam_gen_mode:
+            print("!!!!!!!!!!is_beam_gen_mode")
             if generation_config.num_return_sequences > generation_config.num_beams:
                 raise ValueError("`num_return_sequences` has to be smaller or equal to `num_beams`.")
 
@@ -1618,6 +1623,7 @@ class GenerationMixin:
             )
 
         elif is_beam_sample_gen_mode:
+            print("!!!!!!!!!!is_beam_sample_gen_mode")
             # 11. prepare logits warper
             logits_warper = self._get_logits_warper(generation_config)
 
@@ -1657,6 +1663,7 @@ class GenerationMixin:
             )
 
         elif is_group_beam_gen_mode:
+            print("!!!!!!!!!!is_group_beam_gen_mode")
             if generation_config.num_return_sequences > generation_config.num_beams:
                 raise ValueError("`num_return_sequences` has to be smaller or equal to `num_beams`.")
 
@@ -1703,6 +1710,7 @@ class GenerationMixin:
             )
 
         elif is_constraint_gen_mode:
+            print("!!!!!!!!!!is_constraint_gen_mode")
             if generation_config.num_return_sequences > generation_config.num_beams:
                 raise ValueError("`num_return_sequences` has to be smaller or equal to `num_beams`.")
 

@@ -958,6 +958,7 @@ class T5Stack(T5PreTrainedModel):
         return_dict=None,
     ):
         # Model parallel
+        # SEARCH: T5Stack.forward()
         if self.model_parallel:
             torch.cuda.set_device(self.first_device)
             self.embed_tokens = self.embed_tokens.to(self.first_device)
@@ -1536,6 +1537,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
 
     def __init__(self, config: T5Config):
         super().__init__(config)
+        # SEARCH: T5ForConditionalGeneration.__init__()
         self.model_dim = config.d_model
 
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
@@ -1678,6 +1680,8 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
                 decoder_head_mask = head_mask
 
         # Encode if needed (training, first prediction pass)
+        # SEARCH: Encode
+        # SEARCH: T5ForConditionalGeneration.forward()
         if encoder_outputs is None:
             # Convert encoder inputs in embeddings if needed
             encoder_outputs = self.encoder(
@@ -1717,6 +1721,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
                 decoder_attention_mask = decoder_attention_mask.to(self.decoder.first_device)
 
         # Decode
+        # SEARCH: Decode
         decoder_outputs = self.decoder(
             input_ids=decoder_input_ids,
             attention_mask=decoder_attention_mask,
