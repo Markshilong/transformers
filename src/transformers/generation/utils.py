@@ -1509,7 +1509,6 @@ class GenerationMixin:
                 **model_kwargs,
             )
         if is_greedy_gen_mode:
-            print("!!!!!!!!!!is_greedy_gen_mode")
             if generation_config.num_return_sequences > 1:
                 raise ValueError(
                     "num_return_sequences has to be 1 when doing greedy search, "

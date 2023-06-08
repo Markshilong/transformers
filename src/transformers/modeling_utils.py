@@ -530,7 +530,12 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
                             # module_before = copy.deepcopy(module)
                             # metadata_before = getattr(module.state_dict(), "_metadata", None)
 
-                            # module._load_from_state_dict(*args)
+                            # SEARCH: skip pytorch _load_state_dict_into_model
+                            import sys
+                            sys.path.append('/home/mark/Research/a_MoE_experiments/my_debug_utils')
+                            from my_debug_utils import my_skip_2_enabled
+                            if (my_skip_2_enabled == False):
+                                module._load_from_state_dict(*args)
 
                             # metadata_after = getattr(module.state_dict(), "_metadata", None)
                             # same = (metadata_before == metadata_after)
@@ -2553,7 +2558,17 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
         if from_pt:
             if not is_sharded and state_dict is None:
                 # Time to load the checkpoint
+
+                # my ----------------
+                import psutil
+                memory_usage1 = psutil.Process().memory_info().rss
+                print(f"!!!![before]Memory usage:{memory_usage1} bytes = {memory_usage1 / (1024*1024)} MB = {memory_usage1 / (1024*1024*1024)} GB")
                 state_dict = load_state_dict(resolved_archive_file)
+                memory_usage2 = psutil.Process().memory_info().rss
+                print(f"!!!![after]Memory usage:{memory_usage2} bytes = {memory_usage2 / (1024*1024)} MB = {memory_usage2 / (1024*1024*1024)} GB")
+                print(f"!!!![difff]Memory usage:{memory_usage2 - memory_usage1} bytes = {(memory_usage2 - memory_usage1) / (1024*1024)} MB = {(memory_usage2 - memory_usage1) / (1024*1024*1024)} GB")
+
+                #  ------------------
 
             # set dtype to instantiate the model under:
             # 1. If torch_dtype is not None, we use that dtype
